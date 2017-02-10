@@ -42,7 +42,7 @@ from __init__ import __version__
 from healthcheck import run_test_resource
 from init import DB
 from enums import RESOURCE_TYPES
-from models import Resource, Run, User
+from models import Resource, Run, Tag, User
 from util import render_template2, send_email
 import views
 
@@ -175,13 +175,15 @@ def context_processors():
     """global context processors for templates"""
 
     rtc = views.get_resource_types_counts()
+    tags = views.get_tag_counts()
     return {
         'app_version': __version__,
         'next_page_refresh': next_page_refresh(),
         'resource_types': RESOURCE_TYPES,
         'resource_types_counts': rtc['counts'],
         'resources_total': rtc['total'],
-        'languages': LANGUAGES
+        'languages': LANGUAGES,
+        'tags': tags
     }
 
 
@@ -190,13 +192,16 @@ def home():
     """homepage"""
 
     resource_type = None
+    tag = None
 
     if request.args.get('resource_type') in RESOURCE_TYPES.keys():
         resource_type = request.args['resource_type']
 
+    tag = request.args.get('tag')
+
     query = request.args.get('q')
 
-    response = views.list_resources(resource_type, query)
+    response = views.list_resources(resource_type, query, tag)
     return render_template('home.html', response=response)
 
 
@@ -433,7 +438,10 @@ def add():
     if request.method == 'GET':
         return render_template('add.html')
 
+    tag_list = []
+
     resource_type = request.form['resource_type']
+    tags = request.form['tags']
     url = request.form['url'].strip()
     resource = Resource.query.filter_by(resource_type=resource_type,
                                         url=url).first()
@@ -454,7 +462,12 @@ def add():
         return redirect(url_for('add', lang=g.current_lang,
                                 resource_type=resource_type))
 
-    resource_to_add = Resource(current_user, resource_type, title, url)
+    if tags is not None and tags.strip():
+        for tag in tags.split(','):
+            tag_list.append(Tag(name=tag))
+
+    resource_to_add = Resource(current_user, resource_type, title, url,
+                               tags=tag_list)
     run_to_add = Run(resource_to_add, success, response_time, message,
                      start_time)
 
@@ -475,6 +488,7 @@ def add():
 def update(resource_identifier):
     """update a resource"""
 
+    tag_list = []
     update_counter = 0
 
     resource_identifier_dict = request.get_json()
@@ -482,7 +496,12 @@ def update(resource_identifier):
     resource = Resource.query.filter_by(identifier=resource_identifier).first()
 
     for key, value in resource_identifier_dict.items():
-        if getattr(resource, key) != resource_identifier_dict[key]:
+        if key == 'tags':
+            if getattr(resource, key) != resource.tags2csv:
+                for tag in value.split(','):
+                    tag_list.append(Tag(name=tag))
+                    setattr(resource, key, tag_list)
+        elif getattr(resource, key) != resource_identifier_dict[key]:
             setattr(resource, key, resource_identifier_dict[key])
             update_counter += 1
 

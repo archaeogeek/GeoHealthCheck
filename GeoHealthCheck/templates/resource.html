@@ -40,6 +40,10 @@
                 <td><a href="{{ resource.get_capabilities_url }}">{{ resource.url }}</a></td>
             </tr>
             <tr>
+                <th>Tags</th>
+                <td><input id="resource_tags" type="text" value="{{ resource.tags2csv }}" data-role="tagsinput" disabled/></td>
+            </tr>
+            <tr>
                 <th>{{ _('Response Times (seconds)') }}</th>
                 <td>
                     <ul>
@@ -125,20 +129,24 @@
         html_text += '<button id="title_save" type="button" class="btn btn-default btn-xs">{{ _('Save') }}</button>';
         html_text += '<button id="title_cancel" type="button" class="btn btn-default btn-xs">{{ _('Cancel') }}</button>';
 
+        $('#resource_tags').removeAttr('disabled');
+
         $('#resource_title').html(html_text);
 
         $('#title_cancel').click(function() {
             $('#resource_title').html(title_value);
+            $('#resource_tags').attr('disabled', true);
             return false;
         });
 
         $('#title_save').click(function() {
             var new_title = $('input[name="resource_title_value"]').val();
+            var new_tags = $('#resource_tags').val();
             $('#resource_title').html(new_title);
             $.ajax({
                 type: "POST",
                 url: "{{ url_for('update', resource_identifier=resource.identifier) }}",
-                data: JSON.stringify({ title: new_title }),
+                data: JSON.stringify({ title: new_title, tags: new_tags }),
                 contentType: "application/json; charset=utf-8",
                 dataType: "json",
                 success: function(data){alert(data);},
@@ -146,6 +154,7 @@
                     alert(errMsg);
                 }
             });
+            $('#resource_tags').attr('disabled', true);
             return false;
         });
     });
